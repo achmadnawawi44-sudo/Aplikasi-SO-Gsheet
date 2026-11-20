@@ -16,8 +16,9 @@
 
   <!-- NAVIGASI TAB -->
   <div class="flex justify-center mt-4 mb-2 gap-2 px-4 max-w-sm mx-auto">
-    <button onclick="switchTab('input')" id="tab-input" class="flex-1 py-2 rounded-md font-bold bg-white text-gray-700 shadow tab-active">Input SO</button>
-    <button onclick="switchTab('laporan')" id="tab-laporan" class="flex-1 py-2 rounded-md font-bold bg-white text-gray-700 shadow">Laporan SO</button>
+    <button onclick="switchTab('input')" id="tab-input" class="flex-1 py-2 rounded-md font-bold bg-white text-gray-700 shadow tab-active text-sm">Input SO</button>
+    <button onclick="switchTab('laporan')" id="tab-laporan" class="flex-1 py-2 rounded-md font-bold bg-white text-gray-700 shadow text-sm">Laporan SO</button>
+    <button onclick="switchTab('posting')" id="tab-posting" class="flex-1 py-2 rounded-md font-bold bg-white text-gray-700 shadow text-sm">Posting</button>
   </div>
 
   <!-- ================= HALAMAN 1: INPUT SO ================= -->
@@ -27,11 +28,16 @@
 
       <div id="reader" class="mb-4 border-2 border-blue-500"></div>
 
+      <!-- Tombol Barang Baru (Temuan) -->
+      <div class="mb-4 text-right">
+        <button onclick="aktifkanModeBarangBaru()" class="text-xs bg-yellow-400 hover:bg-yellow-500 text-black font-bold py-1 px-2 rounded shadow">➕ Barang Temuan / Tertukar</button>
+      </div>
+
       <div class="mb-4 relative">
         <label class="block text-sm font-bold text-gray-700 mb-1">BARCODE / NAMA BARANG</label>
         <div class="flex gap-2">
           <input type="text" id="barcode" placeholder="Scan atau ketik nama..." class="flex-1 border border-gray-300 rounded-md p-2 focus:outline-none focus:border-blue-500" onkeypress="handleEnter(event)" autocomplete="off">
-          <button onclick="startCamera()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md">📷 Scan</button>
+          <button onclick="startCamera()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md">📷</button>
         </div>
         <div id="searchResults" class="hidden absolute z-10 w-full bg-white border border-gray-300 mt-1 rounded-md shadow-lg max-h-48 overflow-y-auto"></div>
       </div>
@@ -55,6 +61,14 @@
       <div class="mb-4">
         <label class="block text-sm font-bold text-gray-700 mb-1">QTY SALES PERIODE</label>
         <input type="text" id="qtySales" readonly class="w-full border border-gray-200 bg-gray-50 rounded-md p-2 text-gray-700">
+      </div>
+
+      <!-- Form Khusus Barang Baru -->
+      <div id="formBarangBaru" class="hidden border-2 border-yellow-400 p-3 rounded-md mb-4 bg-yellow-50">
+        <p class="text-xs text-yellow-700 font-bold mb-2">Masukkan Data Manual:</p>
+        <input type="text" id="manualNama" placeholder="Nama Barang Temuan..." class="w-full border border-gray-300 rounded-md p-2 mb-2 text-sm">
+        <input type="number" id="manualHarga" placeholder="Harga Satuan (Rp)..." class="w-full border border-gray-300 rounded-md p-2 mb-2 text-sm">
+        <button onclick="batalBarangBaru()" class="w-full bg-gray-400 text-white text-xs py-1 rounded">Batal / Kembali ke Scan</button>
       </div>
 
       <div class="mb-6">
@@ -106,10 +120,11 @@
           <thead class="bg-gray-100 sticky top-0 shadow-sm z-10">
             <tr>
               <th class="p-2 border-b">Barang</th>
-              <th class="p-2 border-b text-center">Iseller</th>
-              <th class="p-2 border-b text-center">Gudang</th>
-              <th class="p-2 border-b text-center">Fisik</th>
-              <th class="p-2 border-b text-center">Selisih</th>
+              <th class="p-2 border-b text-center">Sls</th>
+              <th class="p-2 border-b text-center">Isl</th>
+              <th class="p-2 border-b text-center">Gdg</th>
+              <th class="p-2 border-b text-center">Fsk</th>
+              <th class="p-2 border-b text-center">Sls</th>
               <th class="p-2 border-b text-center">Aksi</th>
             </tr>
           </thead>
@@ -119,51 +134,89 @@
     </div>
   </div>
 
-  <script>
-    // ================= KONFIGURASI =================
-    // GANTI URL DI BAWAH INI DENGAN URL WEB APP APPS SCRIPT ANDA (yang berakhiran /exec)
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzA7sxHelphC-CmxWsD5guPqVMbSDnzPf9ZXVcOMs72Ekz5FVO705d8xgzqIGd0-ZyXpg/exec'; 
-    // ===============================================
+  <!-- ================= HALAMAN 3: POSTING (TOTAL) ================= -->
+  <div id="page-posting" class="p-4 flex flex-col items-center hidden">
+    <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm text-center">
+      <h2 class="font-bold text-gray-700 mb-6 text-lg">Total Posting SO</h2>
+      
+      <div id="loadingPosting" class="text-center text-gray-500 hidden my-4">Menghitung total...</div>
 
+      <div class="bg-blue-50 border border-blue-200 p-6 rounded-lg mb-6">
+        <p class="text-sm text-gray-600 mb-1">Total Keseluruhan Amount SO:</p>
+        <h1 class="text-3xl font-extrabold text-blue-800" id="totalAmountText">Rp 0</h1>
+        <p class="text-xs text-gray-500 mt-2" id="totalItemText">Dari 0 item</p>
+      </div>
+
+      <button onclick="loadTotalPosting()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-md shadow-md">
+        🔄 Hitung Ulang Total
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzA7sxHelphC-CmxWsD5guPqVMbSDnzPf9ZXVcOMs72Ekz5FVO705d8xgzqIGd0-ZyXpg/exec'; // <--- GANTI URL ANDA
     let html5QrcodeScanner;
     let dataSementara = JSON.parse(localStorage.getItem('so_data_hp')) || [];
+    let isModeBarangBaru = false;
 
     document.addEventListener('DOMContentLoaded', () => { updateTabelSementara(); });
 
-    // --- FUNGSI HELPER ANTI-CORS ---
     async function callGAS(payload) {
       try {
         const response = await fetch(GAS_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Mencegah blokir CORS
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload)
         });
         return await response.json();
       } catch (error) {
         console.error("Fetch Error:", error);
-        alert("Gagal terhubung ke Google. Periksa koneksi internet atau pengaturan Deploy Web App (Harus 'Anyone').");
+        alert("Gagal terhubung ke Google.");
         throw error;
       }
     }
 
-    // --- NAVIGASI TAB ---
     function switchTab(tab) {
       document.getElementById('page-input').classList.add('hidden');
       document.getElementById('page-laporan').classList.add('hidden');
+      document.getElementById('page-posting').classList.add('hidden');
+      
       document.getElementById('tab-input').classList.remove('tab-active');
       document.getElementById('tab-laporan').classList.remove('tab-active');
+      document.getElementById('tab-posting').classList.remove('tab-active');
 
       if (tab === 'input') {
         document.getElementById('page-input').classList.remove('hidden');
         document.getElementById('tab-input').classList.add('tab-active');
-      } else {
+      } else if (tab === 'laporan') {
         document.getElementById('page-laporan').classList.remove('hidden');
         document.getElementById('tab-laporan').classList.add('tab-active');
         loadLaporan();
+      } else {
+        document.getElementById('page-posting').classList.remove('hidden');
+        document.getElementById('tab-posting').classList.add('tab-active');
+        loadTotalPosting();
       }
     }
 
     // --- FUNGSI TAB 1: INPUT SO ---
+    function aktifkanModeBarangBaru() {
+      isModeBarangBaru = true;
+      document.getElementById('formBarangBaru').classList.remove('hidden');
+      document.getElementById('barcode').value = 'BARU-' + Date.now();
+      document.getElementById('namaBarang').value = 'Barang Temuan / Tertukar';
+      document.getElementById('qtySystem').value = '0';
+      document.getElementById('qtyGudang').value = '0';
+      document.getElementById('qtySales').value = '0';
+      document.getElementById('manualNama').focus();
+    }
+
+    function batalBarangBaru() {
+      isModeBarangBaru = false;
+      document.getElementById('formBarangBaru').classList.add('hidden');
+      resetForm();
+    }
+
     function handleEnter(e) { if (e.key === 'Enter') scanBarcode(); }
 
     function startCamera() {
@@ -187,6 +240,7 @@
     }
 
     function scanBarcode() {
+      if(isModeBarangBaru) return alert("Sedang dalam mode Barang Baru. Isi nama & harga, atau klik Batal.");
       const inputVal = document.getElementById('barcode').value.trim();
       if (!inputVal) return;
       document.getElementById('searchResults').classList.add('hidden');
@@ -239,20 +293,32 @@
     }
 
     function simpanSementara() {
-      const barcode = document.getElementById('barcode').value;
-      const namaBarang = document.getElementById('namaBarang').value;
-      const qtyIseller = document.getElementById('qtySystem').value;
-      const qtyFisik = document.getElementById('qtyFisik').value;
+      let barcode = document.getElementById('barcode').value;
+      let namaBarang = document.getElementById('namaBarang').value;
+      let qtyIseller = document.getElementById('qtySystem').value;
+      let qtyFisik = document.getElementById('qtyFisik').value;
+      let harga = window.currentHarga || 0;
+
+      if (isModeBarangBaru) {
+        const manNama = document.getElementById('manualNama').value;
+        const manHarga = document.getElementById('manualHarga').value;
+        if(!manNama || !manHarga) return alert("Isi Nama Barang dan Harga!");
+        namaBarang = manNama;
+        harga = Number(manHarga);
+        qtyIseller = 0;
+      }
 
       if (!barcode || !qtyFisik || namaBarang === '-') return alert('Data belum lengkap!');
 
       const selisih = Number(qtyFisik) - Number(qtyIseller);
-      const newData = { barcode, namaBarang, qtyIseller, qtyFisik, selisih, harga: window.currentHarga || 0, id: Date.now() };
+      const newData = { barcode, namaBarang, qtyIseller, qtyFisik, selisih, harga: harga, id: Date.now() };
 
       dataSementara.push(newData);
       localStorage.setItem('so_data_hp', JSON.stringify(dataSementara));
       updateTabelSementara();
-      resetForm();
+      
+      if(isModeBarangBaru) batalBarangBaru(); 
+      else resetForm();
     }
 
     function updateTabelSementara() {
@@ -343,7 +409,7 @@
           if (res.success) {
             const tbody = document.getElementById('tabelLaporan');
             if (res.data.length === 0) {
-              tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-gray-500">Belum ada data.</td></tr>';
+              tbody.innerHTML = '<tr><td colspan="7" class="text-center p-4 text-gray-500">Belum ada data.</td></tr>';
               return;
             }
             
@@ -352,15 +418,16 @@
               tbody.innerHTML += `
                 <tr>
                   <td class="p-2 border-b">
-                    <div class="font-bold text-gray-800 text-[11px] leading-tight mb-1">${item.namaBarang}</div>
-                    <div class="text-gray-500 text-[10px]">${item.barcode}</div>
+                    <div class="font-bold text-gray-800 text-[10px] leading-tight mb-1">${item.namaBarang}</div>
+                    <div class="text-gray-500 text-[9px]">${item.barcode}</div>
                   </td>
-                  <td class="p-2 border-b text-center font-bold text-gray-600">${item.qtyIseller}</td>
-                  <td class="p-2 border-b text-center font-bold text-gray-600">${item.qtyGudang}</td>
-                  <td class="p-2 border-b text-center font-bold text-blue-700">${item.qtyFisik}</td>
-                  <td class="p-2 border-b text-center font-bold ${colorSelisih}">${item.selisih}</td>
-                  <td class="p-2 border-b text-center">
-                    <button onclick="editItemLaporan(${item.rowIndex}, '${item.namaBarang}', ${item.qtyFisik})" class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold">✏️</button>
+                  <td class="p-1 border-b text-center font-bold text-gray-600 text-[10px]">${item.qtySales}</td>
+                  <td class="p-1 border-b text-center font-bold text-gray-600 text-[10px]">${item.qtyIseller}</td>
+                  <td class="p-1 border-b text-center font-bold text-gray-600 text-[10px]">${item.qtyGudang}</td>
+                  <td class="p-1 border-b text-center font-bold text-blue-700 text-[10px]">${item.qtyFisik}</td>
+                  <td class="p-1 border-b text-center font-bold ${colorSelisih} text-[10px]">${item.selisih}</td>
+                  <td class="p-1 border-b text-center">
+                    <button onclick="editItemLaporan(${item.rowIndex}, '${item.namaBarang}', ${item.qtyFisik})" class="bg-blue-100 text-blue-700 px-1 py-1 rounded text-[10px] font-bold">✏️</button>
                   </td>
                 </tr>`;
             });
@@ -385,6 +452,23 @@
           } else { alert('Gagal update: ' + res.message); }
         })
         .finally(() => { btn.innerHTML = '✏️'; btn.disabled = false; });
+    }
+
+    // --- FUNGSI TAB 3: POSTING (TOTAL) ---
+    function loadTotalPosting() {
+      document.getElementById('loadingPosting').classList.remove('hidden');
+      document.getElementById('totalAmountText').innerText = 'Rp 0';
+      document.getElementById('totalItemText').innerText = 'Memuat...';
+      
+      callGAS({ action: 'getTotalAmount' })
+        .then(res => {
+          document.getElementById('loadingPosting').classList.add('hidden');
+          if (res.success) {
+            const formatRp = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(res.data.total);
+            document.getElementById('totalAmountText').innerText = formatRp;
+            document.getElementById('totalItemText').innerText = 'Dari total ' + res.data.count + ' baris data';
+          }
+        });
     }
   </script>
 </body>

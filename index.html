@@ -63,12 +63,11 @@
         <input type="text" id="qtySales" readonly class="w-full border border-gray-200 bg-gray-50 rounded-md p-2 text-gray-700">
       </div>
 
-      <!-- Form Khusus Barang Baru -->
+      <!-- Form Khusus Barang Baru (TANPA HARGA) -->
       <div id="formBarangBaru" class="hidden border-2 border-yellow-400 p-3 rounded-md mb-4 bg-yellow-50">
         <p class="text-xs text-yellow-700 font-bold mb-2">Masukkan Data Manual:</p>
         <input type="text" id="manualNama" placeholder="Nama Barang Temuan..." class="w-full border border-gray-300 rounded-md p-2 mb-2 text-sm">
-        <input type="number" id="manualHarga" placeholder="Harga Satuan (Rp)..." class="w-full border border-gray-300 rounded-md p-2 mb-2 text-sm">
-        <button onclick="batalBarangBaru()" class="w-full bg-gray-400 text-white text-xs py-1 rounded">Batal / Kembali ke Scan</button>
+        <button onclick="batalBarangBaru()" class="w-full bg-gray-400 hover:bg-gray-500 text-white text-xs py-2 rounded font-bold">Batal / Kembali ke Scan</button>
       </div>
 
       <div class="mb-6">
@@ -240,7 +239,7 @@
     }
 
     function scanBarcode() {
-      if(isModeBarangBaru) return alert("Sedang dalam mode Barang Baru. Isi nama & harga, atau klik Batal.");
+      if(isModeBarangBaru) return alert("Sedang dalam mode Barang Baru. Isi nama barang, atau klik Batal.");
       const inputVal = document.getElementById('barcode').value.trim();
       if (!inputVal) return;
       document.getElementById('searchResults').classList.add('hidden');
@@ -301,10 +300,9 @@
 
       if (isModeBarangBaru) {
         const manNama = document.getElementById('manualNama').value;
-        const manHarga = document.getElementById('manualHarga').value;
-        if(!manNama || !manHarga) return alert("Isi Nama Barang dan Harga!");
+        if(!manNama) return alert("Isi Nama Barang Temuan!");
         namaBarang = manNama;
-        harga = Number(manHarga);
+        harga = 0; // Harga otomatis 0 untuk barang temuan manual
         qtyIseller = 0;
       }
 

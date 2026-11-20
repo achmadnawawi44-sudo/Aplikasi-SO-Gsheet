@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Aplikasi Stok Opname</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --gray: #6b7280;
+      --bg: #f3f4f6;
+      --card: #ffffff;
+      --border: #e5e7eb;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg);
+      padding: 16px;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      background: var(--card);
+      border-radius: 16px;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+      padding: 24px;
+      overflow: hidden;
+    }
+    h1 {
+      text-align: center;
+      font-size: 1.25rem;
+      color: #1f2937;
+      margin-bottom: 20px;
+      font-weight: 700;
+    }
+    .form-group { margin-bottom: 14px; }
+    .form-group label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .input-group { display: flex; gap: 8px; }
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 1rem;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      outline: none;
+      transition: all 0.2s;
+      background-color: #fff;
+    }
+    input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
+    input.readonly {
+      background-color: #f9fafb;
+      color: #4b5563;
+      cursor: not-allowed;
+    }
+    .btn-scan {
+      padding: 0 20px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-scan:hover { background: #4338ca; }
+    
+    .btn-group {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 24px;
+    }
+    .btn-group button {
+      padding: 14px 4px;
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.75rem;
+      color: white;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      transition: opacity 0.2s;
+    }
+    .btn-group button:active { opacity: 0.8; transform: scale(0.98); }
+    .btn-save { background: var(--success); }
+    .btn-back { background: var(--gray); }
+    .btn-next { background: var(--primary); }
+    .btn-delete { background: var(--danger); }
+    .btn-group button:disabled { background: #d1d5db; cursor: not-allowed; }
+    
+    #scanner-container {
+      display: none;
+      margin-top: 14px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 2px solid var(--primary);
+      position: relative;
+    }
+    #reader { width: 100%; }
+    .close-scanner {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    
+    .status {
+      margin-top: 16px;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-align: center;
+      display: none;
+    }
+    .status.show { display: block; }
+    .status.success { background: #ecfdf5; color: #065f46; }
+    .status.error { background: #fef2f2; color: #991b1b; }
+    .status.info { background: #eff6ff; color: #1e40af; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Aplikasi Stok Opname</h1>
+
+  <!-- Barcode -->
+  <div class="form-group">
+    <label>Barcode</label>
+    <div class="input-group">
+      <input type="text" id="barcode" placeholder="Scan / ketik barcode..." onchange="cariBarang()">
+      <button class="btn-scan" onclick="mulaiScan()">📷 Scan</button>
+    </div>
+  </div>
+
+  <!-- Scanner Area -->
+  <div id="scanner-container">
+    <button class="close-scanner" onclick="hentikanScan()">✕</button>
+    <div id="reader"></div>
+  </div>
+
+  <!-- Nama Barang -->
+  <div class="form-group">
+    <label>Nama Barang</label>
+    <input type="text" id="namaBarang" class="readonly" readonly placeholder="-">
+  </div>
+
+  <!-- Qty System & Qty Gudang (Grid 2 kolom) -->
+  <div class="grid-2">
+    <div class="form-group">
+      <label>Qty System</label>
+      <input type="number" id="qtySystem" class="readonly" readonly>
+    </div>
+    <div class="form-group">
+      <label>Qty Gudang</label>
+      <input type="number" id="qtyGudang" class="readonly" readonly>
+    </div>
+  </div>
+
+  <!-- Qty Sales -->
+  <div class="form-group">
+    <label>Qty Sales Periode</label>
+    <input type="number" id="qtySales" class="readonly" readonly>
+  </div>
+
+  <!-- Qty Fisik -->
+  <div class="form-group">
+    <label>Qty Fisik</label>
+    <input type="number" id="qtyFisik" placeholder="Ketik qty fisik..." oninput="hitungOtomatis()">
+  </div>
+
+  <!-- Tombol Aksi -->
+  <div class="btn-group">
+    <button class="btn-save" onclick="simpan()">💾<br>Save</button>
+    <button class="btn-back" onclick="resetForm()">↩️<br>Back</button>
+    <button class="btn-next" onclick="nextItem()">⏭️<br>Next</button>
+    <button class="btn-delete" onclick="hapusItem()">🗑️<br>Delete</button>
+  </div>
+
+  <div id="statusMessage" class="status"></div>
+</div>
+
+<script>
+  // GANTI DENGAN URL WEB APP APPS SCRIPT ANDA
+  const API_URL = 'https://script.google.com/macros/s/AKfycbzA7sxHelphC-CmxWsD5guPqVMbSDnzPf9ZXVcOMs72Ekz5FVO705d8xgzqIGd0-ZyXpg/exec'; 
+
+  let html5QrCode;
+  let currentData = null;
+
+  // ================= API CALL =================
+  async function callAPI(action, params = {}) {
+    const formData = new URLSearchParams();
+    formData.append('action', action);
+    for (const key in params) {
+      formData.append(key, typeof params[key] === 'object' ? JSON.stringify(params[key]) : params[key]);
+    }
+    
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        body: formData,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
+      return await response.json();
+    } catch (err) {
+      console.error('API Error:', err);
+      return { success: false, message: 'Gagal terhubung ke server: ' + err.message };
+    }
+  }
+
+  // ================= CARI BARANG =================
+  async function cariBarang() {
+    const barcode = document.getElementById('barcode').value.trim();
+    if (!barcode) return;
+
+    setStatus("Mencari barang...", "info");
+
+    const res = await callAPI('getBarang', { barcode: barcode });
+    
+    if (res && res.found) {
+      currentData = res;
+      document.getElementById('namaBarang').value = res.namaBarang;
+      document.getElementById('qtySystem').value = res.qtySystem;
+      document.getElementById('qtyGudang').value = res.qtyGudang;
+      document.getElementById('qtySales').value = res.qtySales;
+      document.getElementById('qtyFisik').value = '';
+      setStatus("Barang ditemukan: " + res.namaBarang, "success");
+    } else {
+      currentData = null;
+      clearInputFields();
+      setStatus(res && res.message ? res.message : "Barang tidak ditemukan", "error");
+    }
+  }
+
+  // ================= SIMPAN =================
+  async function simpan() {
+    if (!currentData) {
+      setStatus("Silakan cari barang terlebih dahulu.", "error");
+      return;
+    }
+    const qtyFisik = document.getElementById('qtyFisik').value;
+    if (qtyFisik === '') {
+      setStatus("Qty Fisik harus diisi.", "error");
+      return;
+    }
+
+    const dataToSave = {
+      barcode: currentData.barcode,
+      namaBarang: currentData.namaBarang,
+      harga: currentData.harga,
+      qtySystem: currentData.qtySystem,
+      qtySales: currentData.qtySales,
+      qtyFisik: qtyFisik
+    };
+
+    setStatus("Menyimpan data...", "info");
+    const res = await callAPI('simpanSO', { dataSO: dataToSave });
+
+    if (res.success) {
+      setStatus("Berhasil disimpan!", "success");
+      setTimeout(resetForm, 1000);
+    } else {
+      setStatus("Gagal: " + res.message, "error");
+    }
+  }
+
+  // ================= HELPER =================
+  function resetForm() {
+    document.getElementById('barcode').value = '';
+    clearInputFields();
+    currentData = null;
+    setStatus('', '');
+    hentikanScan();
+  }
+
+  function clearInputFields() {
+    document.getElementById('namaBarang').value = '';
+    document.getElementById('qtySystem').value = '';
+    document.getElementById('qtyGudang').value = '';
+    document.getElementById('qtySales').value = '';
+    document.getElementById('qtyFisik').value = '';
+  }
+
+  function nextItem() {
+    resetForm();
+    document.getElementById('barcode').focus();
+  }
+
+  function hapusItem() {
+    document.getElementById('qtyFisik').value = '';
+    setStatus("Input Qty Fisik dihapus.", "info");
+  }
+
+  function hitungOtomatis() {
+    if (!currentData) return;
+    const qtyFisik = Number(document.getElementById('qtyFisik').value) || 0;
+    const qtySales = Number(currentData.qtySales) || 0;
+    const selisih = qtyFisik - qtySales;
+    // Opsional: tampilkan preview selisih
+    // setStatus("Preview Selisih: " + selisih, "info");
+  }
+
+  function setStatus(msg, type) {
+    const el = document.getElementById('statusMessage');
+    if (!msg) { el.classList.remove('show'); el.innerText = ''; return; }
+    el.innerText = msg;
+    el.className = 'status show ' + (type || 'info');
+  }
+
+  // ================= SCANNER =================
+  function mulaiScan() {
+    const container = document.getElementById('scanner-container');
+    container.style.display = 'block';
+    setStatus("Menyiapkan kamera...", "info");
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus("Browser tidak mendukung akses kamera. Gunakan input manual.", "error");
+      container.style.display = 'none';
+      return;
+    }
+
+    if (!html5QrCode) {
+      html5QrCode = new Html5Qrcode("reader");
+    }
+
+    const config = {
+      fps: 10,
+      qrbox: (viewfinderWidth, viewfinderHeight) => {
+        const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+        const size = Math.floor(minEdge * 0.8);
+        return { width: size, height: size * 0.6 }; // Lebih lebar untuk barcode 1D
+      },
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+    };
+
+    html5QrCode.start(
+      { facingMode: "environment" },
+      config,
+      (decodedText) => {
+        document.getElementById('barcode').value = decodedText;
+        hentikanScan();
+        cariBarang();
+      },
+      (errorMessage) => { /* abaikan */ }
+    ).then(() => {
+      setStatus("Arahkan kamera ke barcode...", "info");
+    }).catch((err) => {
+      setStatus("Gagal akses kamera: " + err + ". Gunakan input manual.", "error");
+      container.style.display = 'none';
+    });
+  }
+
+  function hentikanScan() {
+    if (html5QrCode && html5QrCode.isScanning) {
+      html5QrCode.stop().then(() => {
+        document.getElementById('scanner-container').style.display = 'none';
+      }).catch(() => {
+        document.getElementById('scanner-container').style.display = 'none';
+      });
+    } else {
+      document.getElementById('scanner-container').style.display = 'none';
+    }
+  }
+</script>
+
+</body>
+</html>

@@ -27,7 +27,6 @@
 
       <div id="reader" class="mb-4 border-2 border-blue-500"></div>
 
-      <!-- Barcode / Pencarian -->
       <div class="mb-4 relative">
         <label class="block text-sm font-bold text-gray-700 mb-1">BARCODE / NAMA BARANG</label>
         <div class="flex gap-2">
@@ -68,7 +67,7 @@
         <button onclick="resetForm()" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 rounded-md">↩️ Reset</button>
       </div>
       
-      <button onclick="syncKeSpreadsheet()" class="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-3 rounded-md shadow-md">
+      <button id="btnUpload" onclick="syncKeSpreadsheet()" class="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-3 rounded-md shadow-md">
         ☁️ Upload ke Spreadsheet (<span id="queueCount">0</span>)
       </button>
     </div>
@@ -122,13 +121,30 @@
 
   <script>
     // ================= KONFIGURASI =================
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzA7sxHelphC-CmxWsD5guPqVMbSDnzPf9ZXVcOMs72Ekz5FVO705d8xgzqIGd0-ZyXpg/exec'; // <--- GANTI DENGAN URL WEB APP ANDA
+    // GANTI URL DI BAWAH INI DENGAN URL WEB APP APPS SCRIPT ANDA (yang berakhiran /exec)
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzA7sxHelphC-CmxWsD5guPqVMbSDnzPf9ZXVcOMs72Ekz5FVO705d8xgzqIGd0-ZyXpg/exec'; 
     // ===============================================
 
     let html5QrcodeScanner;
     let dataSementara = JSON.parse(localStorage.getItem('so_data_hp')) || [];
 
     document.addEventListener('DOMContentLoaded', () => { updateTabelSementara(); });
+
+    // --- FUNGSI HELPER ANTI-CORS ---
+    async function callGAS(payload) {
+      try {
+        const response = await fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Mencegah blokir CORS
+          body: JSON.stringify(payload)
+        });
+        return await response.json();
+      } catch (error) {
+        console.error("Fetch Error:", error);
+        alert("Gagal terhubung ke Google. Periksa koneksi internet atau pengaturan Deploy Web App (Harus 'Anyone').");
+        throw error;
+      }
+    }
 
     // --- NAVIGASI TAB ---
     function switchTab(tab) {
@@ -175,8 +191,8 @@
       if (!inputVal) return;
       document.getElementById('searchResults').classList.add('hidden');
       
-      fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'getData', input: inputVal, mode: 'search' }) })
-        .then(res => res.json()).then(res => {
+      callGAS({ action: 'getData', input: inputVal, mode: 'search' })
+        .then(res => {
           if (res.success && res.data.isSearch) {
             if (res.data.data.length > 0) showSearchResults(res.data.data);
             else fetchExactBarcode(inputVal);
@@ -185,8 +201,8 @@
     }
 
     function fetchExactBarcode(barcode) {
-      fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'getData', input: barcode, mode: 'barcode' }) })
-        .then(res => res.json()).then(res => {
+      callGAS({ action: 'getData', input: barcode, mode: 'barcode' })
+        .then(res => {
           if (res.success) {
             if (res.data.namaBarang === '-') alert('Barang tidak ditemukan!');
             else fillForm(res.data);
@@ -296,17 +312,18 @@
 
     function syncKeSpreadsheet() {
       if (dataSementara.length === 0) return alert('Tidak ada data untuk di-upload.');
-      const btn = event.target.closest('button');
+      const btn = document.getElementById('btnUpload');
       const originalText = btn.innerHTML;
       btn.innerHTML = 'Mengirim...'; btn.disabled = true;
 
-      fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'saveBulk', data: dataSementara }) })
-        .then(res => res.json()).then(res => {
+      callGAS({ action: 'saveBulk', data: dataSementara })
+        .then(res => {
           if (res.success) {
             alert(res.data.message);
             dataSementara = []; localStorage.removeItem('so_data_hp'); updateTabelSementara();
           } else { alert('Gagal upload: ' + res.message); }
-        }).finally(() => { btn.innerHTML = originalText; btn.disabled = false; });
+        })
+        .finally(() => { btn.innerHTML = originalText; btn.disabled = false; });
     }
 
     function hapusSemuaData() {
@@ -320,8 +337,8 @@
       document.getElementById('loadingLaporan').classList.remove('hidden');
       document.getElementById('tabelLaporan').innerHTML = '';
       
-      fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'getLaporan' }) })
-        .then(res => res.json()).then(res => {
+      callGAS({ action: 'getLaporan' })
+        .then(res => {
           document.getElementById('loadingLaporan').classList.add('hidden');
           if (res.success) {
             const tbody = document.getElementById('tabelLaporan');
@@ -332,7 +349,6 @@
             
             res.data.reverse().forEach(item => {
               const colorSelisih = Number(item.selisih) < 0 ? 'text-red-600' : (Number(item.selisih) > 0 ? 'text-green-600' : 'text-gray-800');
-
               tbody.innerHTML += `
                 <tr>
                   <td class="p-2 border-b">
@@ -349,9 +365,6 @@
                 </tr>`;
             });
           } else { alert('Gagal memuat: ' + res.message); }
-        }).catch(err => {
-          document.getElementById('loadingLaporan').classList.add('hidden');
-          alert('Error koneksi: ' + err);
         });
     }
 
@@ -364,17 +377,14 @@
       const btn = event.target.closest('button');
       btn.innerHTML = '...'; btn.disabled = true;
 
-      fetch(GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'updateLaporan', rowIndex: rowIndex, qtyFisikBaru: newQty })
-      })
-      .then(res => res.json()).then(res => {
-        if (res.success) {
-          alert(res.data.message);
-          loadLaporan();
-        } else { alert('Gagal update: ' + res.message); }
-      }).catch(err => alert('Error koneksi: ' + err))
-      .finally(() => { btn.innerHTML = '✏️'; btn.disabled = false; });
+      callGAS({ action: 'updateLaporan', rowIndex: rowIndex, qtyFisikBaru: newQty })
+        .then(res => {
+          if (res.success) {
+            alert(res.data.message);
+            loadLaporan();
+          } else { alert('Gagal update: ' + res.message); }
+        })
+        .finally(() => { btn.innerHTML = '✏️'; btn.disabled = false; });
     }
   </script>
 </body>

@@ -63,11 +63,16 @@
         <input type="text" id="qtySales" readonly class="w-full border border-gray-200 bg-gray-50 rounded-md p-2 text-gray-700">
       </div>
 
-      <!-- Form Khusus Barang Baru (TANPA HARGA) -->
+      <!-- Form Khusus Barang Baru (DENGAN BARCODE MANUAL) -->
       <div id="formBarangBaru" class="hidden border-2 border-yellow-400 p-3 rounded-md mb-4 bg-yellow-50">
         <p class="text-xs text-yellow-700 font-bold mb-2">Masukkan Data Manual:</p>
+        <label class="block text-xs font-bold text-gray-700 mb-1">Barcode (Opsional)</label>
+        <input type="text" id="manualBarcode" placeholder="Ketik/Scan Barcode (Kosongkan jika tidak ada)..." class="w-full border border-gray-300 rounded-md p-2 mb-2 text-sm">
+        
+        <label class="block text-xs font-bold text-gray-700 mb-1">Nama Barang</label>
         <input type="text" id="manualNama" placeholder="Nama Barang Temuan..." class="w-full border border-gray-300 rounded-md p-2 mb-2 text-sm">
-        <button onclick="batalBarangBaru()" class="w-full bg-gray-400 hover:bg-gray-500 text-white text-xs py-2 rounded font-bold">Batal / Kembali ke Scan</button>
+        
+        <button onclick="batalBarangBaru()" class="w-full bg-gray-400 hover:bg-gray-500 text-white text-xs py-2 rounded font-bold mt-2">Batal / Kembali ke Scan</button>
       </div>
 
       <div class="mb-6">
@@ -202,12 +207,14 @@
     function aktifkanModeBarangBaru() {
       isModeBarangBaru = true;
       document.getElementById('formBarangBaru').classList.remove('hidden');
-      document.getElementById('barcode').value = 'BARU-' + Date.now();
+      document.getElementById('barcode').value = '';
       document.getElementById('namaBarang').value = 'Barang Temuan / Tertukar';
       document.getElementById('qtySystem').value = '0';
       document.getElementById('qtyGudang').value = '0';
       document.getElementById('qtySales').value = '0';
-      document.getElementById('manualNama').focus();
+      
+      // Fokuskan kursor ke input barcode manual
+      document.getElementById('manualBarcode').focus();
     }
 
     function batalBarangBaru() {
@@ -224,7 +231,16 @@
       readerDiv.style.display = 'block';
       html5QrcodeScanner = new Html5Qrcode("reader");
       html5QrcodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => { stopCamera(); document.getElementById('barcode').value = decodedText; fetchExactBarcode(decodedText); },
+        (decodedText) => { 
+          stopCamera(); 
+          // Jika sedang di mode barang baru, masukkan hasil scan ke input manual
+          if (isModeBarangBaru) {
+            document.getElementById('manualBarcode').value = decodedText;
+          } else {
+            document.getElementById('barcode').value = decodedText; 
+            fetchExactBarcode(decodedText); 
+          }
+        },
         (err) => { }
       ).catch(err => { alert("Kamera gagal diakses."); readerDiv.style.display = 'none'; });
     }
@@ -239,7 +255,7 @@
     }
 
     function scanBarcode() {
-      if(isModeBarangBaru) return alert("Sedang dalam mode Barang Baru. Isi nama barang, atau klik Batal.");
+      if(isModeBarangBaru) return alert("Sedang dalam mode Barang Baru. Isi form manual, atau klik Batal.");
       const inputVal = document.getElementById('barcode').value.trim();
       if (!inputVal) return;
       document.getElementById('searchResults').classList.add('hidden');
@@ -299,10 +315,15 @@
       let harga = window.currentHarga || 0;
 
       if (isModeBarangBaru) {
-        const manNama = document.getElementById('manualNama').value;
+        const manBarcode = document.getElementById('manualBarcode').value.trim();
+        const manNama = document.getElementById('manualNama').value.trim();
+        
         if(!manNama) return alert("Isi Nama Barang Temuan!");
+        
+        // Jika barcode manual kosong, buat otomatis
+        barcode = manBarcode !== '' ? manBarcode : 'BARU-' + Date.now();
         namaBarang = manNama;
-        harga = 0; // Harga otomatis 0 untuk barang temuan manual
+        harga = 0;
         qtyIseller = 0;
       }
 
@@ -370,6 +391,8 @@
       document.getElementById('qtySales').value = '';
       document.getElementById('qtyFisik').value = '';
       document.getElementById('searchResults').classList.add('hidden');
+      document.getElementById('manualBarcode').value = '';
+      document.getElementById('manualNama').value = '';
       window.currentHarga = 0;
       document.getElementById('barcode').focus();
     }
